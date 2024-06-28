@@ -29,45 +29,56 @@ public class WriterView {
     private WriterController writerController = new WriterController(writerService);
 
     public void workProgram() {
-        while (true) {
-            getAllWriters();
-            writeNewWriter();
-            updateWriter();
-            deleteWriter();
-            getAllWriters();
-            break;
+        Scanner scanner = new Scanner(System.in);
+        boolean stopper = true;
+        while(stopper) {
+            System.out.println("Продолжить?");
+            stopper = scanner.nextBoolean();
+            if (stopper==false){
+                break;
+            }
+            System.out.println("Выберите метод для работы: 1 - writeNewWriter, 2 - updateWriter, 3 - deleteWriter, 4 - getAllWriters");
+            int choice = scanner.nextInt();
+            switch (choice) {
+                case 1:
+                    writeNewWriter();
+                    break;
+                case 2:
+                    updateWriter();
+                    break;
+                case 3:
+                    deleteWriter();
+                    break;
+                case 4:
+                    getAllWriters();
+                    break;
+                default:
+                    System.out.println("Некорректный выбор");
+            }
         }
     }
 
     private void writeNewWriter() {
-        int id;
         scanner = new Scanner(System.in);
-        System.out.println("Введите id");
-        id = scanner.nextInt();
-        Writer writerToSave = new Writer();
-        writerToSave.setId(id);
         System.out.println("Введите firstName");
         String firstName = scanner.next();
         System.out.println();
-        writerToSave.setFirstName(firstName);
         System.out.println("Введите lastName");
         String lastName = scanner.next();
-        writerToSave.setLastName(lastName);
         List<Post> posts = new ArrayList<>();
         Post post = null;
         System.out.println("Введите id post");
         boolean stopper = true;
-
+        int postId;
         while (stopper){
-            id = scanner.nextInt();
-            post = postController.read(id);
+            postId = scanner.nextInt();
+            post = postController.read(postId);
             posts.add(post);
             System.out.println("Введите False если хотите выйти из цикла");
             stopper = scanner.nextBoolean();
         }
-        writerToSave.setPosts(posts);
 
-        writerController.create(writerToSave);
+        writerController.create(firstName,lastName,posts);
     }
 
     private void updateWriter() {

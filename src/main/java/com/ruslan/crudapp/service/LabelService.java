@@ -20,8 +20,7 @@ public class LabelService {
     }
 
     public Label create(Label label){
-        labelRepository.save(label);
-        return label;
+        return labelRepository.save(label);
     }
 
     public Label update(Label label){

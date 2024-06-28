@@ -7,6 +7,7 @@ import com.ruslan.crudapp.model.Writer;
 import com.ruslan.crudapp.repository.WriterRepository;
 import com.ruslan.utils.JdbcUtils;
 
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -24,15 +25,16 @@ public class JDBCWriterRepository implements WriterRepository {
 
     @Override
     public List<Writer> getAll() {
-        SQL = "SELECT * FROM writers";
-        SQLForTransition = "SELECT * FROM writer_post";
+        SQL = "SELECT p.*, pl.*, l.* FROM writers p LEFT JOIN writer_post pl on p.id = pl.writer_id\n" +
+                "                 LEFT JOIN posts l on pl.post_id = l.id\n";
         List<Post> posts = new ArrayList<>();
         Post post = null;
         Writer writer = null;
         JDBCPostRepository postRepository = new JDBCPostRepository();
 
         try {
-            PreparedStatement statement = JdbcUtils.getPreparedStatement(SQLForTransition);
+            Connection connection = JdbcUtils.getConnection();
+            PreparedStatement statement = connection.prepareStatement(SQL,ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
             ResultSet resultSet = statement.executeQuery();
 
             while (resultSet.next()){
@@ -40,9 +42,9 @@ public class JDBCWriterRepository implements WriterRepository {
                 posts.add(post);
             }
 
-            statement = JdbcUtils.getPreparedStatement(SQL);
-            resultSet = statement.executeQuery();
             List<Writer> result = new ArrayList<>();
+
+            resultSet.beforeFirst();
 
             while (resultSet.next()) {
                 writer = new Writer(resultSet.getInt("id"),
@@ -61,30 +63,26 @@ public class JDBCWriterRepository implements WriterRepository {
 
     @Override
     public Writer getById(Integer id) {
-        SQL = "SELECT * FROM writers WHERE id = ?";
-        SQLForTransition = "SELECT * FROM postlabel WHERE post_id = ?";
+        SQL = "SELECT p.*, pl.*, l.* FROM writers p LEFT JOIN writer_post pl on p.id = pl.writer_id\n" +
+                "                 LEFT JOIN posts l on pl.post_id = l.id\n" +
+                "                 WHERE p.id =?";
+
         List<Post> posts = new ArrayList<>();
         Post post = null;
         JDBCPostRepository postRepository = new JDBCPostRepository();
         Writer result = null;
         try {
-            PreparedStatement statement = JdbcUtils.getPreparedStatement(SQLForTransition);
+            Connection connection = JdbcUtils.getConnection();
+            PreparedStatement statement = connection.prepareStatement(SQL, ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
             statement.setInt(1, id);
             ResultSet resultSet = statement.executeQuery();
+
             while (resultSet.next()){
                 post = postRepository.getById(resultSet.getInt("post_id"));
                 posts.add(post);
             }
-            statement = JdbcUtils.getPreparedStatement(SQL);
-            statement.setInt(1, id);
-            resultSet = statement.executeQuery();
-
-
-
-
-
+            resultSet.beforeFirst();
             while (resultSet.next()) {
-
                 result = new Writer(resultSet.getInt("id"),
                         resultSet.getString("firstName"),
                         resultSet.getString("lastName"),
@@ -101,23 +99,35 @@ public class JDBCWriterRepository implements WriterRepository {
 
     @Override
     public Writer save(Writer writer) {
-        SQL = "INSERT INTO writers (id, firstName,lastName) VALUES (?,?,?)";
+        SQL = "INSERT INTO writers (firstName, lastName) VALUES (?, ?)";
         SQLForTransition = "INSERT INTO writer_post (writer_id, post_id) VALUES (?, ?)";
-        List<Post> posts = writer.getPosts();
+
         Post post = null;
         try {
-            PreparedStatement statement = JdbcUtils.getPreparedStatement(SQL);
-            statement.setInt(1, writer.getId());
-            statement.setString(2, writer.getFirstName());
-            statement.setString(3, writer.getLastName());
-            statement.executeUpdate();
-            statement = JdbcUtils.getPreparedStatement(SQLForTransition);
-            for(int i = 0;i<posts.size();i++){
-                statement.setInt(1,writer.getId());
-                post = posts.get(i);
-                statement.setInt(2,post.getId());
+            PreparedStatement statement = JdbcUtils.getPreparedStatementWithKeys(SQL);
+            statement.setString(1, writer.getFirstName());
+            statement.setString(2, writer.getLastName());
+
+
+            int affectedRows = statement.executeUpdate();
+            if (affectedRows == 0) {
+                throw new SQLException("Создание записи не удалось, ни одна строка не была изменена.");
             }
-            statement.executeUpdate();
+
+            ResultSet generatedKeys = statement.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                writer.setId(generatedKeys.getInt(1));
+            }
+
+            statement = JdbcUtils.getPreparedStatement(SQLForTransition);
+            List<Post> posts = writer.getPosts();
+            for (int i = 0; i < posts.size(); i++) {
+                statement.setInt(1, writer.getId());
+                post = posts.get(i);
+                statement.setInt(2, post.getId());
+                statement.executeUpdate();
+            }
+
         } catch (SQLException e) {
             e.printStackTrace();
         }

@@ -1,12 +1,14 @@
 package com.ruslan.crudapp.model;
 
+
+import java.util.Date;
 import java.util.List;
 
 public class Post {
     private Integer id;
     private String content;
-    private float created;
-    private float updated;
+    private Date created;
+    private Date updated;
     private List<Label> labels;
     private Status status;
 
@@ -27,19 +29,19 @@ public class Post {
     }
 
 
-    public float getCreated() {
+    public Date getCreated() {
         return created;
     }
 
-    public void setCreated(float created) {
+    public void setCreated(Date created) {
         this.created = created;
     }
 
-    public float getUpdated() {
+    public Date getUpdated() {
         return updated;
     }
 
-    public void setUpdated(float updated) {
+    public void setUpdated(Date updated) {
         this.updated = updated;
     }
 
@@ -59,7 +61,7 @@ public class Post {
         this.status = status;
     }
 
-    public Post(Integer id, String content, float created, float updated, Status status,List<Label> labels) {
+    public Post(Integer id, String content,Date created, Date updated, Status status,List<Label> labels) {
         this.id = id;
         this.content = content;
         this.created = created;

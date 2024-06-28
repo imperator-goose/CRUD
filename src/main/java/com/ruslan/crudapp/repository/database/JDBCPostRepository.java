@@ -7,14 +7,14 @@ import com.ruslan.crudapp.repository.PostRepository;
 import com.ruslan.utils.JdbcUtils;
 
 import java.sql.*;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+
 
 public class JDBCPostRepository implements PostRepository {
+
+
 
     public static Status fromString(String value) {
         if (value != null) {
@@ -30,16 +30,17 @@ public class JDBCPostRepository implements PostRepository {
     private String SQLForTransition=null;
 
     @Override
-    public List<Post> getAll() {
-        SQL = "SELECT * FROM posts";
-        SQLForTransition = "SELECT * FROM postlabel";
+    public List getAll() {
+        SQL = "SELECT p.*, pl.*, l.* FROM posts p LEFT JOIN postlabel pl on p.id = pl.post_id\n" +
+                "                 LEFT JOIN labels l on pl.label_id = l.id\n";
         List<Label> labels = new ArrayList<>();
         Label label = null;
         Post post = null;
         JDBCLabelRepository labelRepository = new JDBCLabelRepository();
 
         try {
-            PreparedStatement statement = JdbcUtils.getPreparedStatement(SQLForTransition);
+            Connection connection = JdbcUtils.getConnection();
+            PreparedStatement statement = connection.prepareStatement(SQL,ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
             ResultSet resultSet = statement.executeQuery();
 
             while (resultSet.next()){
@@ -47,17 +48,15 @@ public class JDBCPostRepository implements PostRepository {
                 labels.add(label);
             }
 
-            statement = JdbcUtils.getPreparedStatement(SQL);
-            resultSet = statement.executeQuery();
             List<Post> result = new ArrayList<>();
-
+            resultSet.beforeFirst();
             while (resultSet.next()) {
                 String enumValue = resultSet.getString("status");
                 Status status = fromString(enumValue);
                 post = new Post(resultSet.getInt("id"),
                         resultSet.getString("content"),
-                        resultSet.getFloat("created"),
-                        resultSet.getFloat("updated"),
+                        resultSet.getDate("created"),
+                        resultSet.getDate("updated"),
                         status,
                         labels);
                 result.add(post);
@@ -71,37 +70,35 @@ public class JDBCPostRepository implements PostRepository {
 
     }
 
+
     @Override
     public Post getById(Integer id) {
-        SQL = "SELECT * FROM posts WHERE id = ?";
-        SQLForTransition = "SELECT * FROM postlabel WHERE post_id = ?";
+        SQL = "SELECT p.*, pl.*, l.* FROM posts p LEFT JOIN postlabel pl on p.id = pl.post_id\n" +
+                "                 LEFT JOIN labels l on pl.label_id = l.id\n" +
+                "                 WHERE p.id =?";
+
         List<Label> labels = new ArrayList<>();
         Label label = null;
         JDBCLabelRepository labelRepository = new JDBCLabelRepository();
         Post result = null;
         try {
-            PreparedStatement statement = JdbcUtils.getPreparedStatement(SQLForTransition);
+            Connection connection = JdbcUtils.getConnection();
+            PreparedStatement statement = connection.prepareStatement(SQL, ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
             statement.setInt(1, id);
             ResultSet resultSet = statement.executeQuery();
+
             while (resultSet.next()){
                 label = labelRepository.getById(resultSet.getInt("label_id"));
                 labels.add(label);
             }
-            statement = JdbcUtils.getPreparedStatement(SQL);
-            statement.setInt(1, id);
-            resultSet = statement.executeQuery();
-
-
-
-
-
+            resultSet.beforeFirst();
             while (resultSet.next()) {
                 String enumValue = resultSet.getString("status");
                 Status status = fromString(enumValue);
                 result = new Post(resultSet.getInt("id"),
                         resultSet.getString("content"),
-                        resultSet.getFloat("created"),
-                        resultSet.getFloat("updated"),
+                        resultSet.getDate("created"),
+                        resultSet.getDate("updated"),
                         status,
                         labels);
             }
@@ -116,25 +113,45 @@ public class JDBCPostRepository implements PostRepository {
 
     @Override
     public Post save(Post post) {
-        SQL = "INSERT INTO posts (id, content,created,updated,status) VALUES (?, ?,?,?,?)";
+        String enumValue = String.valueOf(Status.ACTIVE);
+        Date date = new Date();
+        SQL = "INSERT INTO posts (content, created, updated, status) VALUES (?, ?, ?, ?)";
         SQLForTransition = "INSERT INTO postlabel (post_id, label_id) VALUES (?, ?)";
-        List<Label> postLabels = post.getLabels();
+
+
         Label label = null;
         try {
-            PreparedStatement statement = JdbcUtils.getPreparedStatement(SQL);
-            statement.setInt(1, post.getId());
-            statement.setString(2, post.getContent());
-            statement.setFloat(3, post.getCreated());
-            statement.setFloat(4, post.getUpdated());
-            statement.setString(5, post.getStatus().name());
-            statement.executeUpdate();
-            statement = JdbcUtils.getPreparedStatement(SQLForTransition);
-            for(int i = 0;i<postLabels.size();i++){
-                statement.setInt(1,post.getId());
-                label = postLabels.get(i);
-                statement.setInt(2,label.getId());
+            java.sql.Date sqlDate = new java.sql.Date(date.getTime());
+            PreparedStatement statement = JdbcUtils.getPreparedStatementWithKeys(SQL);
+
+
+
+            statement.setString(1, post.getContent());
+            statement.setString(2, String.valueOf(sqlDate));
+            statement.setString(3, String.valueOf(sqlDate));
+            statement.setString(4, enumValue);
+
+            int affectedRows = statement.executeUpdate();
+            if (affectedRows == 0) {
+                throw new SQLException("Создание записи не удалось, ни одна строка не была изменена.");
             }
-            statement.executeUpdate();
+
+            ResultSet generatedKeys = statement.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                post.setId(generatedKeys.getInt(1));
+            } else {
+                throw new SQLException("Не удалось получить сгенерированный id.");
+            }
+
+
+            List<Label> postLabels = post.getLabels();
+            statement = JdbcUtils.getPreparedStatement(SQLForTransition);
+            for (int i = 0; i < postLabels.size(); i++) {
+                statement.setInt(1, post.getId());
+                label = postLabels.get(i);
+                statement.setInt(2, label.getId());
+                statement.executeUpdate();
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -145,13 +162,11 @@ public class JDBCPostRepository implements PostRepository {
     public Post update(Post post) {
         String SQL = "UPDATE posts SET content = ?, updated = ? WHERE id = ?";
         Date date = new Date();
-        SimpleDateFormat sdf = new SimpleDateFormat("dd.MM");
-        String formattedDate = sdf.format(date);
-        float a = Float.valueOf(formattedDate);
+        java.sql.Date sqlDate = new java.sql.Date(date.getTime());
         try(PreparedStatement statement = JdbcUtils.getPreparedStatement(SQL)) {
             statement.setString(1, post.getContent());
             statement.setInt(3, post.getId());
-            statement.setFloat(2, a);
+            statement.setString(2, String.valueOf(sqlDate));
 
             statement.executeUpdate();
         } catch (SQLException e) {

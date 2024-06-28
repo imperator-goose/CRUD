@@ -11,9 +11,14 @@ import java.util.List;
 
 
 public class JDBCLabelRepository implements LabelRepository {
+    public static void main(String[] args) {
+        JDBCLabelRepository repo = new JDBCLabelRepository();
+        Label label = new Label(1,"java");
+    }
 
 
     private String SQL=null;
+
 
     @Override
     public List<Label> getAll() {
@@ -55,15 +60,26 @@ public class JDBCLabelRepository implements LabelRepository {
 
     @Override
     public Label save(Label label) {
-        SQL = "INSERT INTO labels (id, name) VALUES (?, ?)";
-        try(PreparedStatement statement = JdbcUtils.getPreparedStatement(SQL)) {
+        String SQL = "INSERT INTO labels (name) VALUES (?)";
+        try (PreparedStatement statement = JdbcUtils.getPreparedStatementWithKeys(SQL)) {
+            statement.setString(1, label.getName());
 
-            statement.setInt(1, label.getId());
-            statement.setString(2, label.getName());
-            statement.executeUpdate();
+            int affectedRows = statement.executeUpdate();
+
+            if (affectedRows == 0) {
+                throw new SQLException("Создание записи не удалось, ни одна строка не была изменена.");
+            }
+
+            ResultSet generatedKeys = statement.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                label.setId(generatedKeys.getInt(1));
+            } else {
+                throw new SQLException("Создание записи не удалось, не удалось получить сгенерированный ключ.");
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
         return label;
     }
 

@@ -14,29 +14,44 @@ public class LabelView {
     private LabelController labelController = new LabelController(labelService);
 
     public void workProgram() {
-        while (true) {
-            getAllLabels();
-            writeNewLabel();
-            updateLabel();
-            deleteLabel();
-            getAllLabels();
-            break;
+        Scanner scanner = new Scanner(System.in);
+        boolean stopper = true;
+        while(stopper) {
+            System.out.println("Продолжить?");
+            stopper = scanner.nextBoolean();
+            if (stopper==false){
+                break;
+            }
+            System.out.println("Выберите метод для работы: 1 - writeNewLabel, 2 - updateLabel, 3 - deleteLabel, 4 - getAllLabels");
+            int choice = scanner.nextInt();
+            switch (choice) {
+                case 1:
+                    writeNewLabel();
+                    break;
+                case 2:
+                    updateLabel();
+                    break;
+                case 3:
+                    deleteLabel();
+                    break;
+                case 4:
+                    getAllLabels();
+                    break;
+                default:
+                    System.out.println("Некорректный выбор");
+            }
         }
     }
 
     private void writeNewLabel() {
         scanner = new Scanner(System.in);
-        Label labelToSave = new Label();
+        String labelName = null;
 
         System.out.println("Введите название Label");
-        String nameLabel = scanner.next();
-        System.out.println("Введите id Label");
-        Integer idLabel = scanner.nextInt();
-        labelToSave.setName(nameLabel);
-        labelToSave.setId(idLabel);
+        labelName = scanner.next();
 
 
-        labelController.create(labelToSave);
+        labelController.create(labelName);
     }
 
     private void updateLabel() {

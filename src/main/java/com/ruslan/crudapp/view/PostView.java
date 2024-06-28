@@ -24,38 +24,44 @@ public class PostView {
     private LabelController labelController = new LabelController(labelService);
 
     public void workProgram() {
-        while (true) {
-            getAllPosts();
-            writeNewPost();
-            updatePost();
-            deletePost();
-            getAllPosts();
-            break;
+        Scanner scanner = new Scanner(System.in);
+        boolean stopper = true;
+        while(stopper) {
+            System.out.println("Продолжить?");
+            stopper = scanner.nextBoolean();
+            if (stopper==false){
+                break;
+            }
+            System.out.println("Выберите метод для работы: 1 - writeNewPost, 2 - updatePost, 3 - deletePost, 4 - getAllPosts");
+            int choice = scanner.nextInt();
+            switch (choice) {
+                case 1:
+                    writeNewPost();
+                    break;
+                case 2:
+                    updatePost();
+                    break;
+                case 3:
+                    deletePost();
+                    break;
+                case 4:
+                    getAllPosts();
+                    break;
+                default:
+                    System.out.println("Некорректный выбор");
+            }
         }
     }
 
     private void writeNewPost() {
-        Date date = new Date();
-        SimpleDateFormat sdf = new SimpleDateFormat("dd.MM");
-        String formattedDate = sdf.format(date);
-        float created = Float.parseFloat(formattedDate);
-        int id;
         scanner = new Scanner(System.in);
-        System.out.println("Введите id");
-        id = scanner.nextInt();
-        Post postToSave = new Post();
-        postToSave.setId(id);
-        postToSave.setCreated(created);
-        postToSave.setUpdated(created);
         System.out.println("Введите content");
         String content = scanner.next();
-        postToSave.setStatus(Status.ACTIVE);
-        postToSave.setContent(content);
         List<Label> labels = new ArrayList<>();
         Label label = null;
         System.out.println("Введите id labels");
         boolean stopper = true;
-
+        int id;
         while (stopper){
             id = scanner.nextInt();
             label = labelController.read(id);
@@ -63,9 +69,9 @@ public class PostView {
             System.out.println("Введите False если хотите выйти из цикла");
             stopper = scanner.nextBoolean();
         }
-        postToSave.setLabels(labels);
 
-        postController.create(postToSave);
+
+        postController.create(content,labels);
     }
 
     private void updatePost() {
